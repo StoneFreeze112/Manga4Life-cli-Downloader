@@ -101,24 +101,28 @@ class MangaDownloader:
         return 0
 
     async def colorful_progress_bar(self, current: int, total: int):
-        current = min(current, total)
+        current = min(current, total)  # Prevent overflows
         percent = (current / total) * 100
         bar_length = 50
-        filled_length = int(bar_length * current // total)
-
+        filled_length = round(bar_length * (current / total))
         bar = '█' * filled_length + '-' * (bar_length - filled_length)
 
-        if percent < 50:
+        # Gradient-like color transitions
+        if percent < 30:
             color = Fore.RED
-        elif percent < 80:
+        elif percent < 60:
             color = Fore.YELLOW
+        elif percent < 90:
+            color = Fore.LIGHTGREEN_EX
         else:
             color = Fore.GREEN
 
+        # Async-friendly stdout write
         sys.stdout.write(f'\r{color}[{bar}] {percent:.2f}%{Style.RESET_ALL}')
         sys.stdout.flush()
+        await asyncio.sleep(0)  # Allow other tasks to run
 
-    async def download_chapter_images(self, session: aiohttp.ClientSession, chapter_number: str, total_pages: int, chapter_index: int) -> list:
+    async def download_chapter_images(self, session: aiohttp.ClientSession, chapter_number: str, total_pages: int, chapter_index: int, total_chapters_pages: int) -> list:
         formatted_chapter_number = self.format_chapter_number(chapter_number)
         manga_address = await self.extract_text_from_url(session, formatted_chapter_number)
         image_data = []
@@ -171,7 +175,7 @@ class MangaDownloader:
         async with aiohttp.ClientSession(connector=conn) as session:
             for chapter_index, chapter_number in enumerate(chapters_to_download):
                 total_pages = page_counts[chapter_index]
-                image_data = await self.download_chapter_images(session, chapter_number, total_pages, chapter_index)
+                image_data = await self.download_chapter_images(session, chapter_number, total_pages, chapter_index, total_chapters_pages)
                 if image_data:
                     await self.save_chapter_to_pdf(chapter_number, image_data)
 
